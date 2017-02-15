@@ -1,0 +1,13 @@
+version: "2"
+services:
+  laralamp_web:
+    build: web
+    ports:
+     - "80:80"
+     - "22:22"
+  laralamp_sql:
+    image: mysql:5.7
+    environment:
+     - MYSQL_ROOT_PASSWORD=root
+    ports:
+     - "3306:3306"
