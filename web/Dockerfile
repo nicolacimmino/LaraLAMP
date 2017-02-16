@@ -1,32 +1,34 @@
 FROM php:7.1-apache
 
-RUN apt-get update && apt-get -y install git curl php5-mcrypt php5-json zip
+RUN apt-get update && apt-get -y install git curl php5-mcrypt php5-json zip vim jq
 RUN /usr/sbin/a2enmod rewrite
 
 RUN curl -sS https://getcomposer.org/installer | php
 RUN mv composer.phar /usr/local/bin/composer
+
+# Prepare /var/www so that files uploaded by phpstorm can be used
+# by www-data. We set the sticky bit on /var/www and group and owner
+# rwx. The sticky bit causes all files uploaded to inherit the permissions.
+RUN chown www-data:www-data -R /var/www/
+RUN rm /var/www/html -rf
 RUN mkdir -p /var/www/laravel/storage 
 RUN mkdir -p /var/www/laravel/bootstrap/cache
 RUN mkdir -p /var/www/public
-RUN chown www-data:www-data -R /var/www/laravel/storage /var/www/laravel/bootstrap/cache
+RUN chmod 1771 /var/www -R
 
-# Change default website root to /var/www
-RUN sed -i 's/DocumentRoot \/var\/www\/html\/DocumentRoot/\/var\/www\/public/' /etc/apache2/sites-enabled/000-default.conf
+# Change default website root to /var/www/public
+RUN rm /etc/apache2/sites-enabled/000-default.conf
+COPY laravel-site.conf /etc/apache2/sites-enabled/
 
 # Install ssh so we can use sftp from PHPStorm and avoid volumes
 RUN apt-get install -y openssh-server
 RUN mkdir /var/run/sshd
 
-# Out of the box this is configured for root ssh without password
-# PHPStorm doesn't have this option though, set root password to root
-# and allow ssh with password.
+# Create a user belonging to www-data group so it can upload the site pages.
 # Also allow older sha1 KexAlgorithms that work with older versions of PHPStorm
-RUN echo 'root:root' | chpasswd
-RUN sed -i 's/PermitRootLogin without-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN echo KexAlgorithms diffie-hellman-group1-sha1 >> /etc/ssh/sshd_config
-
-# Some tools we might need from time to time to mess around.
-RUN apt-get install -y vim jq
+RUN useradd phpstorm -g www-data -s /bin/bash -m
+RUN echo phpstorm:phpstorm | chpasswd
 
 EXPOSE 22
 EXPOSE 80
